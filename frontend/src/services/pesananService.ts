@@ -22,6 +22,32 @@ export async function login(username: string, password: string): Promise<string>
   return resp.data.token
 }
 
+
+export interface DaftarPayload {
+  username: string
+  password: string
+  nama_umkm: string
+  email?: string
+}
+
+export interface DaftarResponse {
+  token: string
+  username: string
+  umkm: {
+    id: string
+    nama: string
+  }
+  katalog_contoh: number
+}
+
+export async function daftarAkun(
+  payload: DaftarPayload
+): Promise<DaftarResponse> {
+  const resp = await api.post<DaftarResponse>('/auth/daftar/', payload)
+  return resp.data
+}
+
+
 // ---------------------------------------------------------------------------
 // Pesanan
 // ---------------------------------------------------------------------------

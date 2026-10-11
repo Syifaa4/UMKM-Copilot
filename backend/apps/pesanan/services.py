@@ -13,6 +13,7 @@ Aturan umum:
 
 import logging
 import uuid
+
 from datetime import date
 from decimal import Decimal
 
@@ -364,9 +365,7 @@ def batalkan_pesanan(pesanan: Pesanan) -> Pesanan:
 # ---------------------------------------------------------------------------
 
 def _bangun_input_langflow(pesanan: "Pesanan") -> str:
-    """
-    Sertakan identitas UMKM agar Langflow tidak menebak konteks UMKM.
-    """
+    """Menyusun pesan pelanggan beserta identitas UMKM."""
     return (
         f"UMKM_ID: {pesanan.umkm_id}\n"
         f"{pesanan.teks_chat_asli}"
@@ -461,11 +460,20 @@ def proses_langflow(pesanan: "Pesanan") -> "Pesanan":
         )
 
     # --- Panggil Langflow (di luar transaksi DB) ---
-    input_value = _bangun_input_langflow(pesanan)
+    umkm_id = str(pesanan.umkm_id)
+    input_value = pesanan.teks_chat_asli
+
+    katalog_csv = build_katalog_csv(umkm_id)
+    memori_csv = build_memori_csv(umkm_id)
+
+
     client = LangflowClient()
     hasil: HasilLangflow = client.jalankan(
         input_value=input_value,
         session_id=pesanan.nomor_pesanan,
+        umkm_id=umkm_id,
+        catalog_csv=katalog_csv,
+        memory_csv=memori_csv,
     )
 
     logger.info(

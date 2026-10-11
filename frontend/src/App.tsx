@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import LoginForm from './components/LoginForm'
+import DaftarUMKMForm from './components/DaftarUMKMForm'
 import DaftarPesanan from './components/DaftarPesanan'
+import './index.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,34 +17,33 @@ const queryClient = new QueryClient({
 
 function AppShell() {
   const { isLoggedIn, logout } = useAuth()
+  const [showRegister, setShowRegister] = useState(false)
 
   if (!isLoggedIn) {
-    return <LoginForm />
+    return showRegister ? (
+      <DaftarUMKMForm onSwitchToLogin={() => setShowRegister(false)} />
+    ) : (
+      <LoginForm onSwitchToRegister={() => setShowRegister(true)} />
+    )
   }
 
   return (
-    <div>
-      {/* Navbar sederhana */}
-      <nav style={{
-        background: '#1e293b', color: '#f1f5f9',
-        padding: '0 20px', display: 'flex',
-        justifyContent: 'space-between', alignItems: 'center',
-        height: 48,
-      }}>
-        <span style={{ fontWeight: 700, fontSize: 15 }}>UMKM Order Copilot</span>
-        <button
-          onClick={logout}
-          style={{
-            background: 'none', border: '1px solid #475569',
-            color: '#cbd5e1', padding: '4px 12px', fontSize: 13,
-            borderRadius: 4, cursor: 'pointer',
-          }}
-        >
-          Keluar
+    <div className="app-shell">
+      <header className="app-navbar">
+        <a className="app-brand" href="/" aria-label="UMKM Order Copilot">
+          <span className="app-brand-mark">OC</span>
+          <span className="app-brand-text">
+            <strong>Order Copilot</strong>
+            <small>UMKM WORKSPACE</small>
+          </span>
+        </a>
+        <button className="logout-button" onClick={logout}>
+          Keluar <span aria-hidden="true">↗</span>
         </button>
-      </nav>
-
-      <DaftarPesanan />
+      </header>
+      <main className="app-main">
+        <DaftarPesanan />
+      </main>
     </div>
   )
 }

@@ -20,6 +20,8 @@ Keamanan:
 import json
 import logging
 import re
+import csv
+import io
 from dataclasses import dataclass, field
 
 import httpx
@@ -90,97 +92,194 @@ class HasilLangflow:
 # ---------------------------------------------------------------------------
 # CSV builder
 # ---------------------------------------------------------------------------
-
 def build_katalog_csv(umkm_id: str) -> str:
     """
-    Bangun string CSV katalog aktif milik umkm_id dari database.
-
-    Kolom disamakan dengan format yang digunakan flow Langflow:
-    SKU, Nama_Produk, Kategori, Warna, Ukuran, Harga, Stok, Aktif, Kunci_Produk
-
-    Kolom 'Bahan' tidak ada di model saat ini — dikosongkan agar header tetap
-    kompatibel dengan flow. Ini adalah keterbatasan yang sudah didokumentasikan.
-    Kolom 'Kunci_Produk' digenerate on-the-fly: "Nama | Warna | Ukuran".
+    Bangun CSV katalog aktif milik UMKM.
+    UMKM_ID disertakan agar komponen Langflow dapat
+    memfilter produk berdasarkan pemiliknya.
     """
-    produk_qs = Produk.objects.filter(umkm_id=umkm_id, aktif=True).order_by("sku")
-    baris = ["SKU,Nama_Produk,Kategori,Warna,Ukuran,Harga,Stok,Aktif,Kunci_Produk"]
+    produk_qs = (
+        Produk.objects
+        .filter(umkm_id=umkm_id, aktif=True)
+        .order_by("sku")
+    )
+
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "UMKM_ID",
+        "SKU",
+        "Nama_Produk",
+        "Kategori",
+        "Warna",
+        "Ukuran",
+        "Harga",
+        "Stok",
+        "Aktif",
+        "Kunci_Produk",
+    ])
+
     for p in produk_qs:
         bagian_kunci = [p.nama_produk]
+
         if p.warna:
             bagian_kunci.append(p.warna)
         if p.ukuran:
             bagian_kunci.append(p.ukuran)
-        kunci = " | ".join(bagian_kunci)
-        baris.append(
-            f"{p.sku},{p.nama_produk},{p.kategori},{p.warna},{p.ukuran},"
-            f"{p.harga},{p.stok},TRUE,{kunci}"
-        )
-    return "\n".join(baris)
 
+        writer.writerow([
+            str(umkm_id),
+            p.sku,
+            p.nama_produk,
+            p.kategori,
+            p.warna or "",
+            p.ukuran or "",
+            p.harga,
+            p.stok,
+            "TRUE",
+            " | ".join(bagian_kunci),
+        ])
+
+    return output.getvalue()
 
 def build_memori_csv(umkm_id: str) -> str:
     """
-    Bangun string CSV memori berstatus DISETUJUI milik umkm_id dari database.
-    Hanya baris DISETUJUI yang dikirim ke Langflow — sesuai aturan model Memori.
+    Bangun CSV memori berstatus DISETUJUI milik UMKM.
+    CSV ditulis menggunakan csv.writer agar koma dan
+    karakter khusus dalam isi memori tidak merusak kolom.
     """
     memori_qs = (
         Memori.objects
-        .filter(umkm_id=umkm_id, status=Memori.STATUS_DISETUJUI)
+        .filter(
+            umkm_id=umkm_id,
+            status=Memori.STATUS_DISETUJUI,
+        )
         .order_by("istilah")
     )
-    baris = [
-        "ID_Memori,Istilah,Makna,Sumber,Status,Versi,"
-        "Makna_Sebelumnya,Dibuat_Pada,Disetujui_Oleh,Tindakan,Catatan"
-    ]
-    for m in memori_qs:
-        baris.append(
-            f"{m.id_memori},{m.istilah},{m.makna},{m.sumber},{m.status},"
-            f"{m.versi},{m.makna_sebelumnya},{m.dibuat_pada},"
-            f"{m.disetujui_oleh},{m.tindakan},{m.catatan}"
-        )
-    return "\n".join(baris)
 
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "UMKM_ID",
+        "ID_Memori",
+        "Istilah",
+        "Makna",
+        "Sumber",
+        "Status",
+        "Versi",
+        "Makna_Sebelumnya",
+        "Dibuat_Pada",
+        "Disetujui_Oleh",
+        "Tindakan",
+        "Catatan",
+    ])
+
+    for m in memori_qs:
+        writer.writerow([
+            str(umkm_id),
+            m.id_memori,
+            m.istilah,
+            m.makna,
+            m.sumber,
+            m.status,
+            m.versi,
+            m.makna_sebelumnya or "",
+            m.dibuat_pada or "",
+            m.disetujui_oleh or "",
+            m.tindakan or "",
+            m.catatan or "",
+        ])
+
+    return output.getvalue()
 
 # ---------------------------------------------------------------------------
 # Response parser
 # ---------------------------------------------------------------------------
 
 # Pola untuk mengekstrak blok ```json ... ``` dari field text
-_POLA_JSON_FENCE = re.compile(r"```json\s*([\s\S]+?)\s*```", re.IGNORECASE)
 
-# Status item yang valid dari flow — harus cocok dengan konstanta ItemPesanan
-STATUS_ITEM_VALID = {"DITEMUKAN", "AMBIGU", "TIDAK_DITEMUKAN"}
+_POLA_JSON_FENCE = re.compile(
+    r"```(?:json)?\s*([\s\S]*?)\s*```",
+    re.IGNORECASE,
+)
 
+STATUS_ITEM_VALID = {
+    "DITEMUKAN",
+    "AMBIGU",
+    "TIDAK_DITEMUKAN",
+}
+
+
+def _ambil_json(teks: str) -> dict:
+    """Mengambil objek JSON dari teks respons Langflow."""
+    teks = teks.strip()
+
+    # 1. Coba ambil JSON dari code fence Markdown.
+    cocok = _POLA_JSON_FENCE.search(teks)
+    if cocok:
+        teks = cocok.group(1).strip()
+
+    # 2. Coba jika seluruh teks merupakan JSON.
+    try:
+        data = json.loads(teks)
+        if isinstance(data, dict):
+            return data
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Coba temukan objek JSON jika ada teks tambahan.
+    decoder = json.JSONDecoder()
+
+    for posisi, karakter in enumerate(teks):
+        if karakter != "{":
+            continue
+
+        try:
+            data, _ = decoder.raw_decode(teks[posisi:])
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
+            continue
+
+    raise LangflowResponsInvalidError(
+        "Respons Langflow tidak berisi objek JSON yang valid."
+    )
 
 
 def parse_respons_langflow(raw: dict) -> HasilLangflow:
-    """Parse respons Langflow dan normalisasi dua format JSON yang didukung."""
+    """Parse respons Langflow dan normalisasi format JSON."""
     try:
         teks = (
             raw["outputs"][0]["outputs"][0]
             ["results"]["message"]["data"]["text"]
+        )
+        logger.warning(
+            "DEBUG LANGFLOW - RAW RESPONSE: %s",
+            json.dumps(raw, ensure_ascii=False, default=str)[:12000],
+        )
+
+        logger.warning(
+            "DEBUG LANGFLOW - TEKS OUTPUT: %r",
+            teks,
         )
     except (KeyError, IndexError, TypeError) as exc:
         raise LangflowResponsInvalidError(
             "Struktur respons Langflow tidak sesuai."
         ) from exc
 
-    cocok = _POLA_JSON_FENCE.search(teks)
-    json_str = cocok.group(1) if cocok else teks.strip()
-
-    try:
-        data = json.loads(json_str)
-    except json.JSONDecodeError as exc:
+    if not isinstance(teks, str) or not teks.strip():
         raise LangflowResponsInvalidError(
-            "JSON dari respons Langflow tidak valid."
-        ) from exc
-
-    if not isinstance(data, dict):
-        raise LangflowResponsInvalidError(
-            "JSON dari Langflow bukan objek."
+            "Teks respons Langflow kosong atau tidak valid."
         )
 
-    status_flow = str(data.get("status", "TIDAK_DIKETAHUI"))
+    data = _ambil_json(teks)
+
+    status_flow = str(
+        data.get("status", "TIDAK_DIKETAHUI")
+    )
+
     masalah_raw = data.get("masalah", [])
     raw_items = data.get("items", [])
 
@@ -197,8 +296,7 @@ def parse_respons_langflow(raw: dict) -> HasilLangflow:
                 f"Item ke-{i} bukan objek."
             )
 
-        # Format flow saat ini: produk, jumlah, valid.
-        # Format lama: teks_asli, nama_ditafsirkan, kuantitas, status_item.
+        # Mendukung format baru dan format lama.
         nama = str(
             item.get("nama_ditafsirkan")
             or item.get("produk")
@@ -206,8 +304,7 @@ def parse_respons_langflow(raw: dict) -> HasilLangflow:
         ).strip()
 
         teks_asli = str(
-            item.get("teks_asli")
-            or nama
+            item.get("teks_asli") or nama
         ).strip()
 
         if not teks_asli:
@@ -221,17 +318,14 @@ def parse_respons_langflow(raw: dict) -> HasilLangflow:
             )
         except (TypeError, ValueError):
             kuantitas = 1
-        
 
         if kuantitas < 1:
-            raise LangflowResponsInvalidError(
-                f"Kuantitas item ke-{i} harus minimal 1."
-            )
+            kuantitas = 1
 
         status_item_raw = item.get("status_item")
 
         if status_item_raw:
-            status_item = str(status_item_raw).upper()
+            status_item = str(status_item_raw).strip().upper()
         elif item.get("valid") is True:
             status_item = "DITEMUKAN"
         elif item.get("valid") is False:
@@ -246,7 +340,11 @@ def parse_respons_langflow(raw: dict) -> HasilLangflow:
             ItemParsed(
                 teks_asli=teks_asli,
                 nama_ditafsirkan=nama,
-                sku=str(item["sku"]) if item.get("sku") else None,
+                sku=(
+                    str(item["sku"])
+                    if item.get("sku")
+                    else None
+                ),
                 kuantitas=kuantitas,
                 status_item=status_item,
                 catatan=str(item.get("catatan", "")),
@@ -256,13 +354,13 @@ def parse_respons_langflow(raw: dict) -> HasilLangflow:
     return HasilLangflow(
         status_flow=status_flow,
         items=items,
-        masalah=[
-            str(m) for m in masalah_raw
-        ] if isinstance(masalah_raw, list) else [],
+        masalah=(
+            [str(m) for m in masalah_raw]
+            if isinstance(masalah_raw, list)
+            else []
+        ),
         teks_mentah=teks,
     )
-
-
 
 # ---------------------------------------------------------------------------
 # HTTP Client
@@ -288,21 +386,38 @@ class LangflowClient:
                 "LANGFLOW_API_KEY belum dikonfigurasi di settings."
             )
 
-    def jalankan(self, input_value: str, session_id: str) -> HasilLangflow:
+    def jalankan(
+        self,
+        input_value: str,
+        session_id: str,
+        umkm_id: str,
+        catalog_csv: str,
+        memory_csv: str,
+    ) -> HasilLangflow:
         """
-        Panggil flow Langflow dengan input_value dan session_id.
+        Panggil flow Langflow dengan chat pelanggan, katalog,
+        dan memori bisnis sebagai input terpisah.
 
         Raises:
-            LangflowTimeoutError    : jika request timeout.
-            LangflowError           : untuk HTTP error atau koneksi gagal.
-            LangflowResponsInvalidError: jika respons tidak sesuai kontrak.
+            LangflowTimeoutError: jika request timeout.
+            LangflowError: untuk HTTP error atau koneksi gagal.
+            LangflowResponsInvalidError: jika respons tidak valid.
         """
         payload = {
             "input_value": input_value,
             "input_type": "chat",
             "output_type": "chat",
-            "session_id": session_id,
+            "session_id": str(session_id),
+            "tweaks": {
+                "UMKMOrderCopilot-zOnHU": {
+                    "chat": input_value,
+                    "default_umkm": str(umkm_id),
+                    "catalog_csv": catalog_csv,
+                    "memory_csv": memory_csv,
+                }
+            },
         }
+
         headers = {
             "Content-Type": "application/json",
             "accept": "application/json",
@@ -311,7 +426,8 @@ class LangflowClient:
 
         logger.info(
             "Memanggil Langflow: session_id=%s, input_length=%d",
-            session_id, len(input_value),
+            session_id,
+            len(input_value),
         )
 
         try:
@@ -323,7 +439,8 @@ class LangflowClient:
             )
         except httpx.TimeoutException as exc:
             raise LangflowTimeoutError(
-                f"Langflow tidak merespons dalam {self.TIMEOUT_DETIK} detik."
+                f"Langflow tidak merespons dalam "
+                f"{self.TIMEOUT_DETIK} detik."
             ) from exc
         except httpx.RequestError as exc:
             raise LangflowError(
@@ -331,13 +448,14 @@ class LangflowClient:
             ) from exc
 
         if resp.status_code != 200:
-            # Log status code saja — jangan log body yang mungkin memuat info internal
             logger.error(
                 "Langflow mengembalikan HTTP %d untuk session_id=%s",
-                resp.status_code, session_id,
+                resp.status_code,
+                session_id,
             )
             raise LangflowError(
-                f"Langflow mengembalikan status HTTP {resp.status_code}."
+                f"Langflow mengembalikan status HTTP "
+                f"{resp.status_code}."
             )
 
         try:
