@@ -1,0 +1,21 @@
+UMKM_ID,SKU,Nama_Produk,Kategori,Warna,Ukuran,Harga,Stok,Aktif
+U001,SKU001,Kaos Basic Cotton 24s,Kaos,Hitam,M,45000,20,TRUE
+U001,SKU002,Kaos Basic Cotton 24s,Kaos,Putih,M,45000,18,TRUE
+U001,SKU003,Kaos Premium Combed 24s,Kaos,Hitam,M,65000,35,TRUE
+U001,SKU004,Kaos Premium Combed 24s,Kaos,Putih,L,65000,12,TRUE
+U001,SKU005,Kaos Premium Cotton 30s,Kaos,Hitam,M,70000,15,TRUE
+U001,SKU006,Kaos Premium Cotton 30s,Kaos,Putih,L,70000,22,TRUE
+U001,SKU007,Kaos Oversize Cotton,Kaos,Hitam,L,85000,10,TRUE
+U001,SKU008,Kaos Oversize Cotton,Kaos,Cream,XL,85000,8,TRUE
+U001,SKU009,Kaos Polo Basic,Polo,Navy,M,95000,14,TRUE
+U001,SKU010,Kaos Polo Basic,Polo,Hitam,L,95000,9,TRUE
+U001,SKU011,Hoodie Fleece Basic,Hoodie,Hitam,L,150000,7,TRUE
+U001,SKU012,Hoodie Fleece Basic,Hoodie,Abu,XL,150000,5,TRUE
+U001,SKU013,Kaos Premium Combed 24s,Kaos,Hitam,L,65000,16,TRUE
+U001,SKU014,Kaos Premium Cotton 30s,Kaos,Hitam,L,70000,11,TRUE
+U001,SKU015,Kaos Basic Cotton 24s,Kaos,Hitam,L,45000,13,TRUE
+U002,MA001,Mie Ayam Ori,Makanan,,,10000,50,TRUE
+U002,MA002,Mie Ayam Baso Besar,Makanan,,,15000,50,TRUE
+U002,MA003,Mie Ayam Baso Kecil,Makanan,,,12000,50,TRUE
+U002,MA004,Baso Campur,Makanan,,,12000,50,TRUE
+U002,MA005,Baso Bening,Makanan,,,10000,50,TRUE

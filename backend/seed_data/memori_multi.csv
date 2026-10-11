@@ -1,0 +1,3 @@
+UMKM_ID,ID_Memori,Istilah,Makna,Sumber,Status,Versi,Makna_Sebelumnya,Dibuat_Pada,Disetujui_Oleh,Tindakan,Catatan
+U001,MEM001,premium,Kaos Premium Combed 24s,Koreksi admin,DIGANTIKAN,1,,2026-10-01,Admin,digantikan,Makna yang sebelumnya disetujui; sudah tidak aktif.
+U001,MEM002,premium,Kaos Premium Cotton 30s,Koreksi admin,DISETUJUI,2,Kaos Premium Combed 24s,2026-10-02,Admin,aktif,Makna bisnis 'premium' yang saat ini disetujui.

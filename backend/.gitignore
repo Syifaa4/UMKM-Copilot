@@ -1,0 +1,12 @@
+﻿# Environment variables — jangan pernah di-commit
+.env
+
+# Django local database
+db.sqlite3
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Generated static files
+staticfiles/
