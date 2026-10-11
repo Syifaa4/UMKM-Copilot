@@ -13,6 +13,7 @@ API endpoints:
   /api/pesanan/pesanan/{id}/konfirmasi/             — MENUNGGU_REVIEW → DIKONFIRMASI
   /api/pesanan/pesanan/{id}/selesai/                — DIKONFIRMASI → SELESAI
   /api/pesanan/pesanan/{id}/batalkan/               — * → DIBATALKAN
+  /api/pesanan/pesanan/{id}/proses-langflow/        — DRAFT → MENUNGGU_REVIEW via AI
   /api/auth/token/                                  — obtain auth token
   /admin/                                           — Django Admin
 """
