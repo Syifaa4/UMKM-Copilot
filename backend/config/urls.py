@@ -15,6 +15,7 @@ API endpoints:
   /api/pesanan/pesanan/{id}/batalkan/               — * → DIBATALKAN
   /api/pesanan/pesanan/{id}/proses-langflow/        — DRAFT → MENUNGGU_REVIEW via AI
   /api/auth/token/                                  — obtain auth token
+  /api/auth/daftar/                                 — daftar akun + UMKM baru (POST, publik)
   /admin/                                           — Django Admin
 """
 
@@ -22,9 +23,12 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.authtoken.views import obtain_auth_token
 
+from apps.umkm.views import DaftarView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/token/", obtain_auth_token, name="api-token-auth"),
+    path("api/auth/daftar/", DaftarView.as_view(), name="api-daftar"),
     path("api/katalog/", include("apps.katalog.urls")),
     path("api/memori/", include("apps.memori.urls")),
     path("api/pesanan/", include("apps.pesanan.urls")),
